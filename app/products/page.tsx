@@ -1,30 +1,44 @@
 'use client';
-import largeData from '@/src/mock/large/products.json';
-import smallData from '@/src/mock/small/products.json';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-
-const PAGE_SIZE = 20;
+import { useSearchParams, useRouter } from 'next/navigation';
+import { ResponseData } from '../api/products/route';
 
 export default function Products() {
-  const [currentPage, setCurrentPage] = useState(1);
-  const data = [...largeData, ...smallData];
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const endIndex = startIndex + PAGE_SIZE;
-  const productData = data.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(data.length / PAGE_SIZE);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [productData, setProductData] = useState<ResponseData['productData']>([]);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const currentPage = +(searchParams?.get('page') ?? 1);
+  const pageSize = +(searchParams?.get('size') ?? 20);
 
   const nextPage = () => {
-    setCurrentPage(currentPage + 1);
+    router.push(`products?${createQueryString('page', '' + (currentPage + 1))}`);
   };
 
   const prevPage = () => {
-    setCurrentPage(currentPage - 1);
+    router.push(`products?${createQueryString('page', '' + (currentPage - 1))}`);
   };
 
+  const createQueryString = useCallback(
+    (name: string, value: string) => {
+      const params = new URLSearchParams(searchParams?.toString());
+      params.set(name, value);
+
+      return params.toString();
+    },
+    [searchParams]
+  );
+
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [currentPage]);
+    fetch(`api/products?${searchParams?.toString()}`)
+      .then((res) => res.json())
+      .then((data: ResponseData) => {
+        setProductData(data.productData);
+        setTotalPages(data.pageData.totalPages);
+      });
+  }, [searchParams]);
 
   return (
     <main className='flex min-h-screen flex-col items-center p-24'>
@@ -55,6 +69,16 @@ export default function Products() {
         </button>
         <span>
           Page {currentPage} of {totalPages}
+          <select
+            className='ml-4'
+            value={pageSize}
+            onChange={(e) => router.push(`/products?${createQueryString('size', e.target.value)}`)}
+          >
+            <option value='10'>10</option>
+            <option value='20'>20</option>
+            <option value='50'>50</option>
+            <option value='100'>100</option>
+          </select>
         </span>
         <button onClick={nextPage} disabled={currentPage === totalPages}>
           Next
